@@ -1,15 +1,45 @@
 import db from "../db/db.js";
+import { getGame, getReview, getUser } from "../api/index.js";
 
-export const createNotification = (notification) => {
+export const createNotification = async (notification) => {
+  let message;
+  const { senderId, receiverId, entityId, type } = notification;
+
+  const sender = await getUser(senderId);
+  switch (type) {
+    case "review_liked":
+      const review = await getReview(entityId);
+      const game = await getGame(review.gameId);
+      message = `${sender.username} liked your review on "${game.title}"`;
+      break;
+    case "review_disliked":
+      const reviewDislike = await getReview(entityId);
+      const gameDislike = await getGame(reviewDislike.gameId);
+      message = `${sender.username} disliked your review on "${gameDislike.title}"`;
+      break;
+    case "friend_request":
+      message = `${sender.username} send you a friend request`;
+      break;
+    default:
+      message = "You have a new notification";
+  }
+
   try {
-    const { senderId, receiverId, entityId, type } = notification;
     const stmt = db.prepare(
-      `INSERT INTO notifications (senderId, receiverId, entityId,type) VALUES(?,?,?,?)`
+      "INSERT INTO notifications (senderId,senderAvatarURL, receiverId, entityId, type, message) VALUES(?,?,?,?,?,?)"
     );
-    const res = stmt.run(senderId, receiverId, entityId, type);
+    const res = stmt.run(
+      senderId,
+      sender.avatarURL,
+      receiverId,
+      entityId,
+      type,
+      message
+    );
+
     return res.lastInsertRowid;
   } catch (error) {
-    console.error("error creating notification:", error);
+    console.error("Error creating notification", error);
   }
 };
 
